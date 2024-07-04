@@ -170,15 +170,11 @@ plot_raw_data()
 if st.checkbox('Expand Chart Data', key='checkbox_raw_filtered_data'):
     st.write(filtered_data)
 
-# Calculate and display with Plotyl Chart monthly percentage changes
-# Take the first row of each month to calculate monthly percentage change
-# Drop unnecessary columns
+# Calculate and display with Plotyl Chart monthly percentage changes, use end of month close price
 columns_to_drop = ['open_price', 'high_price', 'low_price', '111SMA', '350SMA', 'PiCycle']
 filtered_data_subset = filtered_data.drop(columns=columns_to_drop)
-# Group by month and keep only the first row of each month
-monthly_first_rows = filtered_data_subset.groupby(filtered_data_subset['date_price'].dt.to_period('M')).first().reset_index(drop=True)
-# Calculate the monthly percentage change
-monthly_first_rows['month_percentage_change'] = monthly_first_rows['close_price'].pct_change() * 100
+monthly_last_rows = filtered_data_subset.groupby(filtered_data_subset['date_price'].dt.to_period('M')).last().reset_index(drop=True)
+monthly_last_rows['month_percentage_change'] = monthly_last_rows['close_price'].pct_change() * 100
 def colour_neg_red(value):
     if value > 0:
         return 'green'
@@ -188,7 +184,7 @@ def colour_neg_red(value):
         return 'grey'
 st.markdown('<h1 style="color: green;">Monthly Percentage Changes</h1>', unsafe_allow_html=True)
 if selected_ticker:
-    data_selected = monthly_first_rows[monthly_first_rows['ticker'] == selected_ticker]
+    data_selected = monthly_last_rows[monthly_last_rows['ticker'] == selected_ticker]
     fig = go.Figure()
     for index, row in data_selected.iterrows():
         month = row['date_price'].strftime('%Y-%m')
@@ -212,8 +208,8 @@ if selected_ticker:
     )
     st.plotly_chart(fig)
 # Allow user to view underlying data
-if st.checkbox('Expand Monthly Percentages Data', key='checkbox_raw_monthly_first_rows'):
-    st.write(monthly_first_rows)
+if st.checkbox('Expand Monthly Percentages Data', key='checkbox_raw_monthly_last_rows'):
+    st.write(monthly_last_rows)
 
 # New Section Header: Display logo MarketMati
 mm_url = 'https://raw.githubusercontent.com/acp-dscs/MarketMati/main/assets/MM.png'
