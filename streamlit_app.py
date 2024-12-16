@@ -1,179 +1,114 @@
 import streamlit as st
-import psycopg2 as psql
+import yfinance as yf
 import pandas as pd
-import numpy as np
 from datetime import date, timedelta
+from plotly import graph_objs as go
+#for PBProphet
+import numpy as np
 from prophet import Prophet
 from prophet.plot import plot_plotly
-from plotly import graph_objs as go
 
 # Digital Assets Dictionary of Images and extra info for user
 crypto_data = [
     {"ticker": "BTC-USD", "name": "Bitcoin", "max_supply": "21,000,000",
-      "description": "Often referrd to as Digital Gold. A pioneer crypto using blockchain for decentralised digital currency without intermediaries.",
-        "image": "https://assets.coingecko.com/coins/images/1/standard/bitcoin.png?1696501400"},
+     "description": "Often referred to as Digital Gold. A pioneer crypto using blockchain for decentralised digital currency without intermediaries.",
+     "image": "https://assets.coingecko.com/coins/images/1/standard/bitcoin.png?1696501400"},
+     {"ticker": "MSTR", "name": "MicroStrategy", "max_supply": "Infinite",
+     "description": "Bitcoin Treasury Company (BTC) In August 2020, MicroStrategy became the first publicly traded US company to acquire and hold bitcoin on its balance sheet as a primary treasury reserve asset. ",
+     "image": "https://raw.githubusercontent.com/acp-dscs/MarketMativ1/main/assets/MSTR.png"},
     {"ticker": "ETH-USD", "name": "Ethereum", "max_supply": "Infinite",
-      "description": "Proof-of-Stake blockchain for dApps, scaling with Layer 2 solutions.",
-        "image": "https://assets.coingecko.com/coins/images/279/standard/ethereum.png?1696501628"},
+     "description": "Proof-of-Stake blockchain for dApps, scaling with Layer 2 solutions.",
+     "image": "https://assets.coingecko.com/coins/images/279/standard/ethereum.png?1696501628"},
     {"ticker": "BNB-USD", "name": "Binance Chain", "max_supply": "200,000,000",
-      "description": "Native Binance Smart Chain coin, reduces trading fees.",
-        "image": "https://assets.coingecko.com/coins/images/825/standard/bnb-icon2_2x.png?1696501970"},
+     "description": "Native Binance Smart Chain coin, reduces trading fees.",
+     "image": "https://assets.coingecko.com/coins/images/825/standard/bnb-icon2_2x.png?1696501970"},
     {"ticker": "SOL-USD", "name": "Solana", "max_supply": "Infinite",
-      "description": "Fast Layer 1 blockchain with smart contracts, Proof-of-History and Stake.",
-        "image": "https://assets.coingecko.com/coins/images/4128/standard/solana.png?1718769756"},
+     "description": "Fast Layer 1 blockchain with smart contracts, Proof-of-History and Stake.",
+     "image": "https://assets.coingecko.com/coins/images/4128/standard/solana.png?1718769756"},
     {"ticker": "XRP-USD", "name": "XRP", "max_supply": "100,000,000,000",
-      "description": "Facilitates global payments via XRPL ledger for banks and providers.",
-        "image": "https://assets.coingecko.com/coins/images/44/standard/xrp-symbol-white-128.png?1696501442"},
+     "description": "Facilitates global payments via XRPL ledger for banks and providers.",
+     "image": "https://assets.coingecko.com/coins/images/44/standard/xrp-symbol-white-128.png?1696501442"},
     {"ticker": "ADA-USD", "name": "Cardano", "max_supply": "45,000,000,000",
-      "description": "Proof-of-Stake blockchain, supports dApps, with a multi-asset ledger and smart contracts.",
-        "image": "https://assets.coingecko.com/coins/images/975/standard/cardano.png?1696502090"},
+     "description": "Proof-of-Stake blockchain, supports dApps, with a multi-asset ledger and smart contracts.",
+     "image": "https://assets.coingecko.com/coins/images/975/standard/cardano.png?1696502090"},
     {"ticker": "DOT-USD", "name": "Polkadot", "max_supply": "Infinite",
-      "description": "Builds decentralised oracle networks for secure blockchain smart contracts.",
-        "image": "https://static.coingecko.com/s/polkadot-73b0c058cae10a2f076a82dcade5cbe38601fad05d5e6211188f09eb96fa4617.gif"},
+     "description": "Builds decentralised oracle networks for secure blockchain smart contracts.",
+     "image": "https://static.coingecko.com/s/polkadot-73b0c058cae10a2f076a82dcade5cbe38601fad05d5e6211188f09eb96fa4617.gif"},
     {"ticker": "LINK-USD", "name": "Chainlink", "max_supply": "1,000,000,000",
-      "description": "Layer-0 platform linking chains, pooled security, diverse protocols.",
-        "image": "https://assets.coingecko.com/coins/images/877/standard/chainlink-new-logo.png?1696502009"},
+     "description": "Layer-0 platform linking chains, pooled security, diverse protocols.",
+     "image": "https://assets.coingecko.com/coins/images/877/standard/chainlink-new-logo.png?1696502009"},
     {"ticker": "MATIC-USD", "name": "Polygon", "max_supply": "10,000,000,000",
-      "description": "The first well-structured, easy-to-use platform for Ethereum scaling.",
-        "image": "https://assets.coingecko.com/coins/images/4713/standard/polygon.png?1698233745"},
+     "description": "The first well-structured, easy-to-use platform for Ethereum scaling.",
+     "image": "https://assets.coingecko.com/coins/images/4713/standard/polygon.png?1698233745"},
     {"ticker": "ZEC-USD", "name": "Zcash", "max_supply": "21,000,000",
-      "description": "Privacy-focused fork of the Bitcoin blockchain, enables public and private transactions.",
-        "image": "https://assets.coingecko.com/coins/images/486/standard/circle-zcash-color.png?1696501740"}
+     "description": "Zcash (ZEC), based on Bitcoin's codebase, uses zk-SNARKs to offer optional anonymity through shielded transactions. As the first major application of this zero-knowledge cryptography, Zcash ensures privacy by encrypting shielded transactions while still validating them under network rules.",
+     "image": "https://assets.coingecko.com/coins/images/486/standard/circle-zcash-color.png?1696501740"}
 ]
 crypto_dict = {crypto['ticker']: crypto for crypto in crypto_data}
 
 # MarketMati Streamlit Program Main Code
-# Import and display logo MarketMati images from GitHub URL
-mme_url = 'https://raw.githubusercontent.com/acp-dscs/MarketMati/main/assets/MMEYE.png'
-st.image(mme_url, use_column_width=True)
+mme_url = 'https://raw.githubusercontent.com/acp-dscs/MarketMativ1/main/assets/MMEYE.png'
+st.image(mme_url, use_container_width=True)
 
-# For Streamlit .TOML secrets file this replaces the .env method
-marketmati = st.secrets['MARKETMATI']
-host = st.secrets['HOST']
-sql_password = st.secrets['SQL_PASSWORD']
-db_user = st.secrets['DB_USER']
-port = st.secrets['PORT']
-
-# Function to establish connection to PostgreSQL DB
-def get_db_connection():
-    conn = psql.connect(
-        database="pagila",
-        user=db_user,
-        host=host,
-        password=sql_password,
-        port=port
-    )
-    return conn
-
-# Fetch cp_data from the database table de10_acp_mm_cp
-def fetch_cp_data():
-    conn = get_db_connection()
-    query = "SELECT * FROM de10_acp_mm_cp"  # Select all columns from the table
-    df = pd.read_sql(query, conn)
-    conn.close()
-    return df
+# Fetch data from Yahoo Finance
+def fetch_yf_data(tickers, start_date, end_date):
+    data = yf.download(tickers, start=start_date, end=end_date)
+    data = data['Close'].reset_index()
+    data = data.melt(id_vars=['Date'], var_name='ticker', value_name='close_price')
+    return data
 
 # Current Prices Table
-st.markdown('<h1 style="color: green;">Live Prices</h1>', unsafe_allow_html=True)
-st.write('Accurate to 15 minutes')
+st.markdown('<h1 style="color: green;">Live Prices - Select Assets</h1>', unsafe_allow_html=True)
+st.write('Accurate to the latest market data')
 
-# Fetch and display data
-cp_data = fetch_cp_data()
-cp_data_renamed = cp_data[['ticker', 'current_price']].rename(columns={
-    'ticker': 'Digital Asset',
-    'current_price': 'Price USD'
-})
-# Transpose the DataFrame
-cp_data_transposed = cp_data_renamed.T
-st.dataframe(cp_data_transposed, hide_index=True)
-# Allow user to view underlying data
-if st.checkbox('Expand Current Price Table Data', key='checkbox_raw_cp_data'):
-    st.write(cp_data)
+# Fetch live prices
+def fetch_live_prices(tickers):
+    live_data = []
+    for ticker in tickers:
+        ticker_data = yf.Ticker(ticker)
+        hist_data = ticker_data.history(period="1d")
+        if not hist_data.empty and 'Close' in hist_data.columns:
+            live_price = hist_data['Close'].iloc[-1]
+            live_data.append({"ticker": ticker, "current_price": live_price})
+        else:
+            live_data.append({"ticker": ticker, "current_price": None})  # Handle missing data gracefully
+    return pd.DataFrame(live_data)
 
-# Fetch hp_data from the database table de10_acp_mm_hp
-def fetch_hp_data():
-    conn = get_db_connection()
-    query = "SELECT * FROM de10_acp_mm_hp ORDER BY date_price DESC LIMIT 10"  # Fetch the last 10 rows based on timestamp
-    df = pd.read_sql(query, conn)
-    conn.close()
-    return df
+live_prices = fetch_live_prices([crypto['ticker'] for crypto in crypto_data])
+st.dataframe(live_prices.rename(columns={"ticker": "Digital Asset", "current_price": "Price USD"}), hide_index=True)
 
-# Function to fetch data from the database, change INTERVAL '10 years' to number of years desired
-@st.cache_data
-def fetch_data():
-    conn = get_db_connection()
-    query = """
-        SELECT *
-        FROM de10_acp_mm_hp
-        WHERE date_price >= NOW() - INTERVAL '10 years'
-        ORDER BY date_price DESC
-    """
-    df = pd.read_sql(query, conn)
-    conn.close()
-    df['date_price'] = pd.to_datetime(df['date_price']).dt.tz_localize(None)
-    return df
-
-# Previous Day Prices Table
-st.markdown('<h1 style="color: green;">Previous Day Market Prices USD</h1>', unsafe_allow_html=True)
-yesterday = date.today() - timedelta(days=1)
-st.write(f'Updated daily, end of day prices for {yesterday}')
-# Fetch and display data, presented for Web App
-hp_data = fetch_hp_data()
-hp_data_renamed = hp_data[['ticker', 'open_price', 'close_price', 'high_price', 'low_price']].rename(columns={
-    'ticker': 'Digital Asset',
-    'open_price': 'Open',
-    'close_price': 'Close',
-    'high_price': 'High',
-    'low_price': 'Low'
-})
-st.dataframe(hp_data_renamed, hide_index=True)
-# Allow user to view underlying data
-if st.checkbox('Expand Open and Close Table Data', key='checkbox_raw_hp_data'):
-    st.write(hp_data)
-
-# Streamlit app layout for filtered data
+# Interactive Section for User
 st.markdown('<h1 style="color: green;">Cryptocurrency Deep Dive</h1>', unsafe_allow_html=True)
 st.subheader('Top Picks and Analysis')
-
-# Fetch data
-data = fetch_data()
-
-# Get unique tickers for dropdown menu
-tickers = data['ticker'].unique()
-
-# Dropdown and additional info for user to select cryptocurrency ticker
-selected_ticker = st.selectbox('Cryptocurrency tickers:', tickers, key='select_ticker_dropdown')
+selected_ticker = st.selectbox('Cryptocurrency tickers:', [crypto['ticker'] for crypto in crypto_data])
 selected_crypto = crypto_dict[selected_ticker]
 st.image(selected_crypto['image'])
 st.subheader(selected_crypto['name'])
 st.write(f"Max Supply: {selected_crypto['max_supply']}")
 st.text(selected_crypto['description'])
-# Filter by selected ticker
-filtered_data = data[data['ticker'] == selected_ticker]
-# Sort data by date
-filtered_data = filtered_data.sort_values('date_price')
-# Calculate 111 day and 350 day simple moving averages needed for Pi Cycle
-filtered_data['111SMA'] = filtered_data['close_price'].rolling(window=111, min_periods=1).mean()
-filtered_data['350SMA'] = filtered_data['close_price'].rolling(window=350, min_periods=1).mean()
-# Calculate Pi Cycle indicator
-filtered_data['PiCycle'] = filtered_data['350SMA'] * 2
+
+# Fetch historical data
+historical_data = fetch_yf_data([selected_ticker], "2010-01-01", date.today().strftime('%Y-%m-%d'))
+historical_data = historical_data[historical_data['ticker'] == selected_ticker]
+historical_data['111SMA'] = historical_data['close_price'].rolling(window=111, min_periods=1).mean()
+historical_data['350SMA'] = historical_data['close_price'].rolling(window=350, min_periods=1).mean()
+historical_data['PiCycle'] = historical_data['350SMA'] * 2
+
 # Historical Prices and Pi Cycle Chart
 def plot_raw_data():
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=filtered_data['date_price'], y=filtered_data['close_price'], name=f"{selected_ticker} Day Close", line=dict(color='green', width=1.5)))
-    fig.add_trace(go.Scatter(x=filtered_data['date_price'], y=filtered_data['111SMA'], name='111-day SMA', line=dict(color='blue', width=1.5)))
-    fig.add_trace(go.Scatter(x=filtered_data['date_price'], y=filtered_data['PiCycle'], name='350-day SMA', line=dict(color='red', width=1.5)))
+    fig.add_trace(go.Scatter(x=historical_data['Date'], y=historical_data['close_price'], name=f"{selected_ticker} Day Close", line=dict(color='green', width=1.5)))
+    fig.add_trace(go.Scatter(x=historical_data['Date'], y=historical_data['111SMA'], name='111-day SMA', line=dict(color='blue', width=1.5)))
+    fig.add_trace(go.Scatter(x=historical_data['Date'], y=historical_data['PiCycle'], name='350-day SMA', line=dict(color='red', width=1.5)))
     fig.layout.update(title_text=f"{selected_ticker} Price with Pi Cycle Indicator", xaxis_rangeslider_visible=True)
     st.plotly_chart(fig)
-plot_raw_data()
-# Allow user to view underlying data
-if st.checkbox('Expand Chart Data', key='checkbox_raw_filtered_data'):
-    st.write(filtered_data)
 
-# Calculate and display with Plotyl Chart monthly percentage changes, use end of month close price
+plot_raw_data()
+
+# Calculate and display with Plotly Chart monthly percentage changes, use end of month close price
 columns_to_drop = ['open_price', 'high_price', 'low_price', '111SMA', '350SMA', 'PiCycle']
-filtered_data_subset = filtered_data.drop(columns=columns_to_drop)
-monthly_last_rows = filtered_data_subset.groupby(filtered_data_subset['date_price'].dt.to_period('M')).last().reset_index(drop=True)
+filtered_data_subset = historical_data.drop(columns=[col for col in columns_to_drop if col in historical_data])
+monthly_last_rows = filtered_data_subset.groupby(filtered_data_subset['Date'].dt.to_period('M')).last().reset_index(drop=True)
 monthly_last_rows['month_percentage_change'] = monthly_last_rows['close_price'].pct_change() * 100
 def colour_neg_red(value):
     if value > 0:
@@ -182,12 +117,14 @@ def colour_neg_red(value):
         return 'red'
     else:
         return 'grey'
+
 st.markdown('<h1 style="color: green;">Monthly Percentage Changes</h1>', unsafe_allow_html=True)
+
 if selected_ticker:
     data_selected = monthly_last_rows[monthly_last_rows['ticker'] == selected_ticker]
     fig = go.Figure()
     for index, row in data_selected.iterrows():
-        month = row['date_price'].strftime('%Y-%m')
+        month = row['Date'].strftime('%Y-%m')
         change = row['month_percentage_change']
         if not pd.isnull(change):
             colour = colour_neg_red(change)
@@ -195,7 +132,7 @@ if selected_ticker:
                 x=[month],
                 y=[change],
                 marker_color=colour,
-                name=row['date_price'].strftime('%b %Y'),
+                name=row['Date'].strftime('%b %Y'),
                 text=f"{change:.2f}%",
                 hoverinfo='text'
             ))
@@ -207,49 +144,124 @@ if selected_ticker:
         plot_bgcolor='rgba(0,0,0,0)'
     )
     st.plotly_chart(fig)
+
 # Allow user to view underlying data
 if st.checkbox('Expand Monthly Percentages Data', key='checkbox_raw_monthly_last_rows'):
     st.write(monthly_last_rows)
 
+# --- Add Annual Candlestick Section ---
+# Hardcoded data for Bitcoin from 2008 to 2013
+hardcoded_btc_data = {
+    'Year': [2008, 2009, 2010, 2011, 2012, 2013],
+    'Year Open': [0.001, 0.39, 0.10, 0.30, 5.27, 13.30],
+    'Year High': [0.39, 1.00, 0.39, 31.91, 13.70, 1156.00],
+    'Year Low': [0.001, 0.01, 0.06, 2.05, 4.41, 13.30],
+    'Year Close': [0.39, 0.10, 0.30, 4.70, 13.30, 755.00],
+    'Digital Asset': ['BTC-USD'] * 6
+}
+
+# Convert hardcoded data into a DataFrame for Bitcoin
+btc_data_df = pd.DataFrame(hardcoded_btc_data)
+
+# Fetch annual candlestick data for the selected crypto
+def fetch_annual_candles(tickers, start_date="2010-01-01"):
+    annual_data = []
+    for ticker in tickers:
+        ticker_data = yf.Ticker(ticker)  # Fetch data from Yahoo Finance
+        history = ticker_data.history(start=start_date, interval="1mo")  # Fetch monthly data from start date
+        history.reset_index(inplace=True)
+        history['Year'] = history['Date'].dt.year  # Extract year from Date
+        yearly_summary = history.groupby('Year').agg(
+            Open=('Open', 'first'),
+            High=('High', 'max'),
+            Low=('Low', 'min'),
+            Close=('Close', 'last')
+        ).reset_index()
+        yearly_summary['ticker'] = ticker
+        annual_data.append(yearly_summary)
+    return pd.concat(annual_data, ignore_index=True)
+
+# Fetch annual candlestick data for the selected tickers
+tickers = [selected_ticker]  # Only show the selected ticker in the interactive section
+annual_candles_data = fetch_annual_candles(tickers, start_date="2014-01-01")
+
+# Rename and display the dataframe with relevant columns
+annual_candles_data.rename(columns={
+    'ticker': 'Digital Asset',
+    'Open': 'Year Open',
+    'High': 'Year High',
+    'Low': 'Year Low',
+    'Close': 'Year Close'
+}, inplace=True)
+
+# Combine the hardcoded BTC data with the fetched data only if the selected ticker is BTC-USD
+if selected_ticker == 'BTC-USD':
+    combined_data = pd.concat([btc_data_df, annual_candles_data], ignore_index=True)
+else:
+    combined_data = annual_candles_data
+
+# Show the full table with the annual candlestick data
+st.markdown('<h2 style="color: green;">Annual Data</h2>', unsafe_allow_html=True)
+st.dataframe(combined_data, hide_index=True)
+
+
+#Start of PBProphet section
+
 # New Section Header: Display logo MarketMati
 mm_url = 'https://raw.githubusercontent.com/acp-dscs/MarketMati/main/assets/MM.png'
-st.image(mm_url, use_column_width=True)
+st.image(mm_url, use_container_width=True)  # Changed to use_container_width
+
 # Forecasting in years with slider for user, up to ten years
-START = "2014-01-01"
+START = "2010-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
 n_years = st.slider('Move the toggle to gain an insight into what the future holds for this cryptocurrency:', 1, 10)
 period = n_years * 365
+
+# Filter the historical data for the selected ticker
+filtered_data = historical_data[historical_data['ticker'] == selected_ticker]
+
 # Forecasting with Prophet
-df_forecast_train = filtered_data[['date_price', 'close_price']]
-df_forecast_train = df_forecast_train.rename(columns={"date_price": "ds", "close_price": "y"})
+df_forecast_train = filtered_data[['Date', 'close_price']]  # Ensure 'Date' column is used instead of 'date_price'
+df_forecast_train = df_forecast_train.rename(columns={"Date": "ds", "close_price": "y"})
 m = Prophet()
 m.fit(df_forecast_train)
 future = m.make_future_dataframe(periods=period)
 forecast = m.predict(future)
-# Prevent the lower interval becoming negative
+
+# Prevent the lower interval from becoming negative
 forecast['yhat_upper'] = np.maximum(forecast['yhat_upper'], 0)
 forecast['yhat_lower'] = np.maximum(forecast['yhat_lower'], 0)
+
 # Forecasting chart
 st.write(f'**Forecasting {selected_ticker} for {n_years} year{"s" if n_years > 1 else ""}**')
 fig1 = plot_plotly(m, forecast)
 lgreen_line = '#00CC96'
 dgreen_marker = '#006400'
+
+# Adjust line and marker colors in the plot
 for trace in fig1['data']:
     trace['line']['color'] = lgreen_line
     if 'marker' in trace:
         trace['marker']['color'] = dgreen_marker
+
 fig1.update_layout(
     xaxis=dict(title=''),
     yaxis=dict(title='')
 )
 st.plotly_chart(fig1)
+
 # Allow user to view underlying data
 if st.checkbox('Expand Forecasting Data', key='checkbox_raw_data_forecast'):
     st.write(forecast)
 
+# End of PBProphet section
+
+
+
 # Import and display logo MarketMati images from GitHub URL
-mmf_url = 'https://raw.githubusercontent.com/acp-dscs/MarketMati/main/assets/MarketMati.png'
-st.image(mmf_url, use_column_width=True)
+mmf_url = 'https://raw.githubusercontent.com/acp-dscs/MarketMativ1/main/assets/MarketMati.png'
+st.image(mmf_url, use_container_width=True)
+
 # Disclaimer
 st.title('')
 st.markdown('<h1 style="color: red;">DISCLAIMER - MarketMati</h1>', unsafe_allow_html=True)
