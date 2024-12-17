@@ -57,25 +57,83 @@ def fetch_yf_data(tickers, start_date, end_date):
     data = data.melt(id_vars=['Date'], var_name='ticker', value_name='close_price')
     return data
 
-# Current Prices Table
-st.markdown('<h1 style="color: green;">Live Prices - Select Assets</h1>', unsafe_allow_html=True)
-st.write('Accurate to the latest market data')
-
-# Fetch live prices
+# Fetch live prices and previous day's close
 def fetch_live_prices(tickers):
     live_data = []
     for ticker in tickers:
         ticker_data = yf.Ticker(ticker)
-        hist_data = ticker_data.history(period="1d")
-        if not hist_data.empty and 'Close' in hist_data.columns:
-            live_price = hist_data['Close'].iloc[-1]
-            live_data.append({"ticker": ticker, "current_price": live_price})
+        hist_data = ticker_data.history(period="5d")  # Fetch last 5 days of data
+        if len(hist_data) >= 2:  # Ensure we have at least two days of data
+            live_price = hist_data['Close'].iloc[-1]  # Most recent price
+            prev_close = hist_data['Close'].iloc[-2]  # Second most recent price
+            percent_change = ((live_price - prev_close) / prev_close) * 100  # % Change
+            live_data.append({
+                "ticker": ticker,
+                "current_price": live_price,
+                "prev_close": prev_close,
+                "percent_change": percent_change,
+            })
         else:
-            live_data.append({"ticker": ticker, "current_price": None})  # Handle missing data gracefully
+            live_data.append({
+                "ticker": ticker,
+                "current_price": None,
+                "prev_close": None,
+                "percent_change": None,
+            })
     return pd.DataFrame(live_data)
 
-live_prices = fetch_live_prices([crypto['ticker'] for crypto in crypto_data])
-st.dataframe(live_prices.rename(columns={"ticker": "Digital Asset", "current_price": "Price USD"}), hide_index=True)
+# Prepare the data
+live_prices = fetch_live_prices([crypto["ticker"] for crypto in crypto_data])
+
+# Prepare data for heatmap visualization
+z = np.array([
+    live_prices['percent_change'].fillna(0).tolist()  # % Change for heatmap
+])
+
+text = np.array([
+    [f"{row['ticker']}<br>Price: {row['current_price']:.2f} USD<br>% Change: {row['percent_change']:.2f}%"
+     if pd.notnull(row['percent_change']) else f"{row['ticker']}: Data N/A"
+     for _, row in live_prices.iterrows()]
+])
+
+colors = np.array([
+    ['green' if row['percent_change'] > 0 else 'red' if row['percent_change'] < 0 else 'white'
+     for _, row in live_prices.iterrows()]
+])
+
+# Create the heatmap
+fig = go.Figure(data=go.Heatmap(
+    z=z,
+    text=text,
+    texttemplate="%{text}",
+    colorscale=[[0, "red"], [0.5, "white"], [1, "green"]],
+    showscale=True,  # Show color scale for better context
+    zmin=-5,  # Adjust for typical percentage range
+    zmax=5,
+))
+
+# Heatmap Title
+st.markdown('<h1 style="color: green;">Digital Assets & MSTR</h1>', unsafe_allow_html=True)
+st.write('Accurate to YFinance Market Data')
+# Add title and layout adjustments
+fig.update_layout(
+    title="Heatmap: Expand to see - Current Price Vs Previous Day Close",
+    xaxis=dict(
+        title="",
+        tickmode="array",
+        tickvals=np.arange(len(live_prices)),
+        ticktext=live_prices['ticker'].tolist(),
+    ),
+    yaxis=dict(
+        title="",
+        tickmode="array",
+        tickvals=[0],
+        ticktext=[""],
+    ),
+)
+
+# Display in Streamlit
+st.plotly_chart(fig)
 
 # Interactive Section for User
 st.markdown('<h1 style="color: green;">Cryptocurrency Deep Dive</h1>', unsafe_allow_html=True)
@@ -150,6 +208,7 @@ if st.checkbox('Expand Monthly Percentages Data', key='checkbox_raw_monthly_last
     st.write(monthly_last_rows)
 
 # --- Add Annual Candlestick Section ---
+# --- Add Annual Candlestick Section ---
 # Hardcoded data for Bitcoin from 2008 to 2013
 hardcoded_btc_data = {
     'Year': [2008, 2009, 2010, 2011, 2012, 2013],
@@ -200,16 +259,37 @@ if selected_ticker == 'BTC-USD':
 else:
     combined_data = annual_candles_data
 
-# Show the full table with the annual candlestick data
+# Ensure 'Year' column is formatted as YYYY
+combined_data['Year'] = combined_data['Year'].astype(int)
+
+# Create a Plotly table for display with a more neutral green theme
+fig = go.Figure(data=[go.Table(
+    header=dict(
+        values=list(combined_data.columns),
+        fill_color='darkgreen',  # Darker green header for a more professional look
+        font=dict(color='white', size=12),  # White text for header
+        align='center'
+    ),
+    cells=dict(
+        values=[combined_data[col] for col in combined_data.columns],
+        fill_color=['#E8F5E9' if i % 2 == 0 else '#C8E6C9' for i in range(len(combined_data))],  # Subtle alternating green shades
+        font=dict(color='black', size=12),  # Black text for readability
+        align='center'
+    )
+)])
+
+# Show the Plotly table
 st.markdown('<h2 style="color: green;">Annual Data</h2>', unsafe_allow_html=True)
-st.dataframe(combined_data, hide_index=True)
+st.plotly_chart(fig)
 
 
-#Start of PBProphet section
+#Start of FBProphet section
 
 # New Section Header: Display logo MarketMati
 mm_url = 'https://raw.githubusercontent.com/acp-dscs/MarketMati/main/assets/MM.png'
 st.image(mm_url, use_container_width=True)  # Changed to use_container_width
+# FBProphet Title
+st.markdown('<h2 style="color: green;">Time Series Forecasting - META FB Prophet</h2>', unsafe_allow_html=True)
 
 # Forecasting in years with slider for user, up to ten years
 START = "2010-01-01"
@@ -269,3 +349,5 @@ st.subheader('IS NOT INVESTMENT ADVICE')
 st.write('Use for educational purposes only. Financial investment decisions are your own.')
 st.write('**CAUTION: The Digital Assets class is highly volatile.**')
 st.write('If you are considering investing in Digital Assets, ensure you **ALWAYS** seek professional advice from a qualified financial advisor.')
+st.write('**Credit to sources below:**')
+st.write('FB Prophet - Time Series, YFinance API, CoinGecko & Philip Swift - Pi Cycle')
