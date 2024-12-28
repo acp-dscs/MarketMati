@@ -12,6 +12,12 @@ from pycoingecko import CoinGeckoAPI
 cg = CoinGeckoAPI()
 import requests
 
+# Set the page title and favicon
+st.set_page_config(
+    page_title="MarketMati",  # Website name shown in the browser tab
+    page_icon='https://raw.githubusercontent.com/acp-dscs/MarketMativ1/main/assets/MarketMati.png'
+)
+
 # MarketMati Streamlit Program Main Code
 mme_url = 'https://raw.githubusercontent.com/acp-dscs/MarketMativ1/main/assets/MMEYE.png'
 st.image(mme_url, use_container_width=True)
