@@ -7,6 +7,127 @@ from plotly import graph_objs as go
 import numpy as np
 from prophet import Prophet
 from prophet.plot import plot_plotly
+#for CoinGecko
+from pycoingecko import CoinGeckoAPI
+cg = CoinGeckoAPI()
+import requests
+
+# MarketMati Streamlit Program Main Code
+mme_url = 'https://raw.githubusercontent.com/acp-dscs/MarketMativ1/main/assets/MMEYE.png'
+st.image(mme_url, use_container_width=True)
+
+
+# Top 250 Crypto Title
+st.markdown('<h1 style="color: green;">Top 250 Digital Assets Overview</h1>', unsafe_allow_html=True)
+st.write('Accurate to CoinGecko API market data')
+
+# Initialize the CoinGecko API client
+cg = CoinGeckoAPI()
+
+# Fetch the current Fear and Greed Index from the Alternative.me API
+def fetch_fear_and_greed_index():
+    try:
+        # Get the current Fear and Greed Index from the Alternative.me API
+        url = "https://api.alternative.me/fng/"
+        response = requests.get(url)
+        
+        # Check if the API call is successful
+        data = response.json()
+        
+        # Check if 'data' is available and contains the index
+        if 'data' in data and len(data['data']) > 0:
+            index = data['data'][0]  # Get the most recent Fear and Greed Index
+            return index["value"], index["value_classification"]
+        else:
+            # Handle cases where data is missing or the API call fails
+            st.error("Failed to fetch Fear and Greed Index data: No data available.")
+            return None, None
+    except Exception as e:
+        st.error(f"Error fetching Fear and Greed Index: {e}")
+        return None, None
+
+# Fetch the top 250 cryptocurrencies sorted by market cap or by name
+@st.cache_data
+def get_sorted_crypto_list(sort_by='market_cap'):
+    try:
+        # Fetch the cryptocurrencies from CoinGecko
+        coins = cg.get_coins_markets(vs_currency='usd', per_page=250, page=1)
+        
+        # Sort the cryptocurrencies based on the selected sort criterion
+        if sort_by == 'market_cap':
+            coins = sorted(coins, key=lambda x: x['market_cap'], reverse=True)
+        elif sort_by == 'name':
+            coins = sorted(coins, key=lambda x: x['name'])
+
+        # Create a DataFrame with cryptocurrency details
+        df = pd.DataFrame(coins)
+        df = df[['id', 'name', 'symbol', 'market_cap', 'current_price', 'total_supply', 'circulating_supply', 'high_24h', 'low_24h']]
+        return df
+    
+    except Exception as e:
+        st.error(f"Error fetching cryptocurrencies: {e}")
+        return pd.DataFrame()  # Return an empty dataframe on error
+    
+# Fetch live price and other details for selected cryptocurrency
+def fetch_price_and_details(crypto_id):
+    try:
+        # Ensure that the coin ID is correctly passed to the API
+        price = cg.get_price(ids=crypto_id, vs_currencies='usd')
+        coin_details = cg.get_coin_by_id(crypto_id)
+        
+        return price.get(crypto_id, {}).get('usd', "Price not available"), coin_details
+    except Exception as e:
+        # Improved error message to catch 'coin not found' and show details
+        st.error(f"Error fetching price and details for {crypto_id}: {e}")
+        return None, None
+
+# Streamlit widget for choosing the sorting criterion
+sort_by = st.selectbox("Sort cryptocurrencies by:", ['market_cap', 'name'])
+
+# Get the list of cryptocurrencies sorted by the selected criterion
+crypto_df = get_sorted_crypto_list(sort_by=sort_by)
+
+# Create the dictionary for the dropdown widget with coin IDs and names
+crypto_dict = {row['name']: row['id'] for _, row in crypto_df.iterrows()}
+
+# Streamlit dropdown widget for cryptocurrency selection
+crypto_name = st.selectbox("Select a cryptocurrency:", list(crypto_dict.keys()))
+
+# Find the corresponding crypto ID
+crypto_id = crypto_dict.get(crypto_name, None)
+
+# Display price and other details of the selected cryptocurrency
+if crypto_id:
+    price, coin_details = fetch_price_and_details(crypto_id)
+    if price:
+        st.write(f"The current price of **{crypto_name}** is **${price:.2f} USD**.")
+        
+        # Expandable section for additional data about the selected coin
+        with st.expander("See more details about this cryptocurrency"):
+            if coin_details:
+                st.write(f"**Market Rank:** {coin_details['market_cap_rank']}")
+                st.write(f"**Total Supply:** {coin_details.get('market_data', {}).get('total_supply', 'N/A')}")
+                st.write(f"**Max Supply:** {coin_details.get('market_data', {}).get('max_supply', 'N/A')}")
+                st.write(f"**24h Low:** ${coin_details.get('market_data', {}).get('low_24h', {}).get('usd', 'N/A')}")
+                st.write(f"**24h High:** ${coin_details.get('market_data', {}).get('high_24h', {}).get('usd', 'N/A')}")
+                st.write(f"**Current Circulating Supply:** {coin_details.get('market_data', {}).get('circulating_supply', 'N/A')}")
+
+# Display the top 250 cryptocurrencies with an option to expand for the top 250
+with st.expander("Click to expand and view top 250 cryptocurrencies"):
+    if not crypto_df.empty:
+        st.dataframe(crypto_df[['name', 'symbol', 'market_cap', 'current_price', 'total_supply', 'circulating_supply', 'high_24h', 'low_24h']])
+    else:
+        st.write("No data available.")
+
+# Fetch and display the current Fear and Greed Index
+fng_value, fng_classification = fetch_fear_and_greed_index()
+
+if fng_value:
+    st.markdown('<h1 style="color: green;">Crypto Fear & Greed Index Rating</h1>', unsafe_allow_html=True)
+    st.write(f"**Fear & Greed Index:** {fng_value} ({fng_classification})")
+else:
+    st.write("Unable to fetch the Fear and Greed Index.")
+
 
 # Digital Assets Dictionary of Images and extra info for user
 crypto_data = [
@@ -45,10 +166,6 @@ crypto_data = [
      "image": "https://assets.coingecko.com/coins/images/486/standard/circle-zcash-color.png?1696501740"}
 ]
 crypto_dict = {crypto['ticker']: crypto for crypto in crypto_data}
-
-# MarketMati Streamlit Program Main Code
-mme_url = 'https://raw.githubusercontent.com/acp-dscs/MarketMativ1/main/assets/MMEYE.png'
-st.image(mme_url, use_container_width=True)
 
 # Fetch data from Yahoo Finance
 def fetch_yf_data(tickers, start_date, end_date):
@@ -113,8 +230,8 @@ fig = go.Figure(data=go.Heatmap(
 ))
 
 # Heatmap Title
-st.markdown('<h1 style="color: green;">Digital Assets & MSTR</h1>', unsafe_allow_html=True)
-st.write('Accurate to YFinance Market Data')
+st.markdown('<h1 style="color: green;">Heatmap - Select Assets</h1>', unsafe_allow_html=True)
+st.write('Expand for clear chart view - Accurate to YFinance market data')
 # Add title and layout adjustments
 fig.update_layout(
     title="Heatmap: Expand to see - Current Price Vs Previous Day Close",
@@ -350,4 +467,4 @@ st.write('Use for educational purposes only. Financial investment decisions are 
 st.write('**CAUTION: The Digital Assets class is highly volatile.**')
 st.write('If you are considering investing in Digital Assets, ensure you **ALWAYS** seek professional advice from a qualified financial advisor.')
 st.write('**Credit to sources below:**')
-st.write('FB Prophet - Time Series, YFinance API, CoinGecko & Philip Swift - Pi Cycle')
+st.write('FB Prophet - Time Series, YFinance API, CoinGecko API & Philip Swift - Pi Cycle')
