@@ -18,6 +18,18 @@ st.set_page_config(
     page_icon='https://raw.githubusercontent.com/acp-dscs/MarketMativ1/main/assets/MarketMati.png'
 )
 
+# Inject meta tags for social media sharing (Open Graph / Twitter Cards)
+st.markdown("""
+    <meta property="og:title" content="MarketMati" />
+    <meta property="og:description" content="Welcome to MarketMati, your one-stop app for market analysis." />
+    <meta property="og:image" content="https://github.com/acp-dscs/MarketMati/blob/main/assets/MarketMati.png?raw=true" />
+    <meta property="og:url" content="https://marketmati.streamlit.app/" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MarketMati" />
+    <meta name="twitter:description" content="Welcome to MarketMati, your one-stop app for market analysis." />
+    <meta name="twitter:image" content="https://github.com/acp-dscs/MarketMati/blob/main/assets/MarketMati.png?raw=true" />
+""", unsafe_allow_html=True)
+
 # MarketMati Streamlit Program Main Code
 mme_url = 'https://raw.githubusercontent.com/acp-dscs/MarketMativ1/main/assets/MMEYE.png'
 st.image(mme_url, use_container_width=True)
