@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -181,16 +182,17 @@ def fetch_yf_data(tickers, start_date, end_date):
     return data
 
 # Fetch live prices and previous day's close
+@st.cache_data(ttl=300)  # Cache results for 5 minutes
 def fetch_live_prices(tickers):
     live_data = []
     for ticker in tickers:
         try:
             ticker_data = yf.Ticker(ticker)
-            hist_data = ticker_data.history(period="5d")  # Fetch last 5 days of data
-            if len(hist_data) >= 2:  # Ensure we have at least two days of data
-                live_price = hist_data['Close'].iloc[-1]  # Most recent price
-                prev_close = hist_data['Close'].iloc[-2]  # Second most recent price
-                percent_change = ((live_price - prev_close) / prev_close) * 100  # % Change
+            hist_data = ticker_data.history(period="5d")
+            if len(hist_data) >= 2:
+                live_price = hist_data['Close'].iloc[-1]
+                prev_close = hist_data['Close'].iloc[-2]
+                percent_change = ((live_price - prev_close) / prev_close) * 100
                 live_data.append({
                     "ticker": ticker,
                     "current_price": live_price,
@@ -205,7 +207,7 @@ def fetch_live_prices(tickers):
                     "percent_change": None,
                 })
         except yf.exceptions.YFRateLimitError:
-            st.warning("Yahoo Finance rate-limited this app. Live price data may not be available on Streamlit Cloud. Try again later or run locally.")
+            st.warning(f"Yahoo Finance rate limit reached while fetching {ticker}. Data may be incomplete.")
             live_data.append({
                 "ticker": ticker,
                 "current_price": None,
@@ -220,8 +222,8 @@ def fetch_live_prices(tickers):
                 "prev_close": None,
                 "percent_change": None,
             })
+        time.sleep(1)  # Delay to reduce rate limit risk
     return pd.DataFrame(live_data)
-
 
 # Prepare the data
 live_prices = fetch_live_prices([crypto["ticker"] for crypto in crypto_data])
@@ -245,6 +247,7 @@ colors = np.array([
         for _, row in live_prices.iterrows()
     ]
 ])
+
 
 
 # Create the heatmap
