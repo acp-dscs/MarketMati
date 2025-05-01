@@ -1,4 +1,3 @@
-import time
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -22,7 +21,6 @@ st.set_page_config(
 # MarketMati Streamlit Program Main Code
 mme_url = 'https://raw.githubusercontent.com/acp-dscs/MarketMativ1/main/assets/MMEYE.png'
 st.image(mme_url, use_container_width=True)
-
 
 # Top 250 Crypto Title
 st.markdown('<h1 style="color: green;">Top 250 Digital Assets Overview</h1>', unsafe_allow_html=True)
@@ -135,7 +133,6 @@ if fng_value:
 else:
     st.write("Unable to fetch the Fear and Greed Index.")
 
-
 # Digital Assets Dictionary of Images and extra info for user
 crypto_data = [
     {"ticker": "BTC-USD", "name": "Bitcoin", "max_supply": "21,000,000",
@@ -182,47 +179,28 @@ def fetch_yf_data(tickers, start_date, end_date):
     return data
 
 # Fetch live prices and previous day's close
-@st.cache_data(ttl=300)  # Cache results for 5 minutes
 def fetch_live_prices(tickers):
     live_data = []
     for ticker in tickers:
-        try:
-            ticker_data = yf.Ticker(ticker)
-            hist_data = ticker_data.history(period="5d")
-            if len(hist_data) >= 2:
-                live_price = hist_data['Close'].iloc[-1]
-                prev_close = hist_data['Close'].iloc[-2]
-                percent_change = ((live_price - prev_close) / prev_close) * 100
-                live_data.append({
-                    "ticker": ticker,
-                    "current_price": live_price,
-                    "prev_close": prev_close,
-                    "percent_change": percent_change,
-                })
-            else:
-                live_data.append({
-                    "ticker": ticker,
-                    "current_price": None,
-                    "prev_close": None,
-                    "percent_change": None,
-                })
-        except yf.exceptions.YFRateLimitError:
-            st.warning(f"Yahoo Finance rate limit reached while fetching {ticker}. Data may be incomplete.")
+        ticker_data = yf.Ticker(ticker)
+        hist_data = ticker_data.history(period="5d")  # Fetch last 5 days of data
+        if len(hist_data) >= 2:  # Ensure we have at least two days of data
+            live_price = hist_data['Close'].iloc[-1]  # Most recent price
+            prev_close = hist_data['Close'].iloc[-2]  # Second most recent price
+            percent_change = ((live_price - prev_close) / prev_close) * 100  # % Change
+            live_data.append({
+                "ticker": ticker,
+                "current_price": live_price,
+                "prev_close": prev_close,
+                "percent_change": percent_change,
+            })
+        else:
             live_data.append({
                 "ticker": ticker,
                 "current_price": None,
                 "prev_close": None,
                 "percent_change": None,
             })
-        except Exception as e:
-            st.error(f"Error fetching data for {ticker}: {e}")
-            live_data.append({
-                "ticker": ticker,
-                "current_price": None,
-                "prev_close": None,
-                "percent_change": None,
-            })
-        time.sleep(1)  # Delay to reduce rate limit risk
     return pd.DataFrame(live_data)
 
 # Prepare the data
@@ -240,15 +218,9 @@ text = np.array([
 ])
 
 colors = np.array([
-    [
-        'green' if pd.notnull(row['percent_change']) and row['percent_change'] > 0
-        else 'red' if pd.notnull(row['percent_change']) and row['percent_change'] < 0
-        else 'white'
-        for _, row in live_prices.iterrows()
-    ]
+    ['green' if row['percent_change'] > 0 else 'red' if row['percent_change'] < 0 else 'white'
+     for _, row in live_prices.iterrows()]
 ])
-
-
 
 # Create the heatmap
 fig = go.Figure(data=go.Heatmap(
@@ -431,7 +403,6 @@ fig = go.Figure(data=[go.Table(
 st.markdown('<h2 style="color: green;">Annual Data</h2>', unsafe_allow_html=True)
 st.plotly_chart(fig)
 
-
 #Start of FBProphet section
 
 # New Section Header: Display logo MarketMati
@@ -486,7 +457,6 @@ if st.checkbox('Expand Forecasting Data', key='checkbox_raw_data_forecast'):
 # End of PBProphet section
 
 
-
 # Import and display logo MarketMati images from GitHub URL
 mmf_url = 'https://raw.githubusercontent.com/acp-dscs/MarketMativ1/main/assets/MarketMati.png'
 st.image(mmf_url, use_container_width=True)
@@ -500,3 +470,4 @@ st.write('**CAUTION: The Digital Assets class is highly volatile.**')
 st.write('If you are considering investing in Digital Assets, ensure you **ALWAYS** seek professional advice from a qualified financial advisor.')
 st.write('**Credit to sources below:**')
 st.write('FB Prophet - Time Series, YFinance API, CoinGecko API & Philip Swift - Pi Cycle')
+
