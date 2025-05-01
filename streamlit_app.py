@@ -184,19 +184,36 @@ def fetch_yf_data(tickers, start_date, end_date):
 def fetch_live_prices(tickers):
     live_data = []
     for ticker in tickers:
-        ticker_data = yf.Ticker(ticker)
-        hist_data = ticker_data.history(period="5d")  # Fetch last 5 days of data
-        if len(hist_data) >= 2:  # Ensure we have at least two days of data
-            live_price = hist_data['Close'].iloc[-1]  # Most recent price
-            prev_close = hist_data['Close'].iloc[-2]  # Second most recent price
-            percent_change = ((live_price - prev_close) / prev_close) * 100  # % Change
+        try:
+            ticker_data = yf.Ticker(ticker)
+            hist_data = ticker_data.history(period="5d")  # Fetch last 5 days of data
+            if len(hist_data) >= 2:  # Ensure we have at least two days of data
+                live_price = hist_data['Close'].iloc[-1]  # Most recent price
+                prev_close = hist_data['Close'].iloc[-2]  # Second most recent price
+                percent_change = ((live_price - prev_close) / prev_close) * 100  # % Change
+                live_data.append({
+                    "ticker": ticker,
+                    "current_price": live_price,
+                    "prev_close": prev_close,
+                    "percent_change": percent_change,
+                })
+            else:
+                live_data.append({
+                    "ticker": ticker,
+                    "current_price": None,
+                    "prev_close": None,
+                    "percent_change": None,
+                })
+        except yf.exceptions.YFRateLimitError:
+            st.warning("Yahoo Finance rate-limited this app. Live price data may not be available on Streamlit Cloud. Try again later or run locally.")
             live_data.append({
                 "ticker": ticker,
-                "current_price": live_price,
-                "prev_close": prev_close,
-                "percent_change": percent_change,
+                "current_price": None,
+                "prev_close": None,
+                "percent_change": None,
             })
-        else:
+        except Exception as e:
+            st.error(f"Error fetching data for {ticker}: {e}")
             live_data.append({
                 "ticker": ticker,
                 "current_price": None,
@@ -204,6 +221,7 @@ def fetch_live_prices(tickers):
                 "percent_change": None,
             })
     return pd.DataFrame(live_data)
+
 
 # Prepare the data
 live_prices = fetch_live_prices([crypto["ticker"] for crypto in crypto_data])
