@@ -181,26 +181,35 @@ def fetch_yf_data(tickers, start_date, end_date):
 # Fetch live prices and previous day's close
 def fetch_live_prices(tickers):
     live_data = []
+    
+    # Download last 5 days of data for all tickers at once
+    hist_data = yf.download(tickers=tickers, period="5d", group_by="ticker", threads=True)
+    
     for ticker in tickers:
-        ticker_data = yf.Ticker(ticker)
-        hist_data = ticker_data.history(period="5d")  # Fetch last 5 days of data
-        if len(hist_data) >= 2:  # Ensure we have at least two days of data
-            live_price = hist_data['Close'].iloc[-1]  # Most recent price
-            prev_close = hist_data['Close'].iloc[-2]  # Second most recent price
-            percent_change = ((live_price - prev_close) / prev_close) * 100  # % Change
-            live_data.append({
-                "ticker": ticker,
-                "current_price": live_price,
-                "prev_close": prev_close,
-                "percent_change": percent_change,
-            })
-        else:
+        try:
+            # Access data depending on whether multiple tickers or single ticker
+            data = hist_data[ticker] if len(tickers) > 1 else hist_data
+            closes = data['Close'].dropna()
+            if len(closes) >= 2:
+                live_price = closes.iloc[-1]
+                prev_close = closes.iloc[-2]
+                percent_change = ((live_price - prev_close) / prev_close) * 100
+                live_data.append({
+                    "ticker": ticker,
+                    "current_price": live_price,
+                    "prev_close": prev_close,
+                    "percent_change": percent_change,
+                })
+            else:
+                raise ValueError("Not enough data")
+        except Exception as e:
             live_data.append({
                 "ticker": ticker,
                 "current_price": None,
                 "prev_close": None,
                 "percent_change": None,
             })
+
     return pd.DataFrame(live_data)
 
 # Prepare the data
