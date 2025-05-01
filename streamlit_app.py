@@ -238,9 +238,14 @@ text = np.array([
 ])
 
 colors = np.array([
-    ['green' if row['percent_change'] > 0 else 'red' if row['percent_change'] < 0 else 'white'
-     for _, row in live_prices.iterrows()]
+    [
+        'green' if pd.notnull(row['percent_change']) and row['percent_change'] > 0
+        else 'red' if pd.notnull(row['percent_change']) and row['percent_change'] < 0
+        else 'white'
+        for _, row in live_prices.iterrows()
+    ]
 ])
+
 
 # Create the heatmap
 fig = go.Figure(data=go.Heatmap(
